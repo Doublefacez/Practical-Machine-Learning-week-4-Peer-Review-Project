@@ -15,7 +15,7 @@ library(elasticnet)
 library(rpart.plot)
 
 getwd()
-setwd("C:/Users/lamti/Desktop/datasciencecoursera/Course 8 Practical machine learning/Week 4/Peer assessment")
+setwd("C:/Users/lamti/Desktop/datasciencecoursera/Course 8 Practical machine learning/Week 4/Practical-Machine-Learning-week-4-Peer-Review-Project")
 
 
 data_test <- read.csv("pml-testing.csv", header = TRUE, na.strings = c("NA", "#DIV/0!", ""))
