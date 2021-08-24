@@ -1,0 +1,155 @@
+---
+title: "Week 4 Peer review assesment"
+output: 
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+This project is conducted to predict the manner in which
+a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior. Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. This report showed how the prediction model is built for this particular purpose, and are used to predict 20 different test cases.
+
+## Data information
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+
+### Loading packages require to run the codes
+
+```{r library, cache=TRUE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(AppliedPredictiveModeling)
+library(pgmm)
+library(rpart)
+library(lubridate)
+library(forecast)
+library(e1071)
+library(ElemStatLearn)
+library(gbm)
+library(elasticnet)
+library(rpart.plot)
+```
+
+### Loading data sets into R
+```{r data, cache=TRUE}
+data_test <- read.csv("pml-testing.csv", header = TRUE, na.strings = c("NA", "#DIV/0!", ""))
+data_train <- read.csv("pml-training.csv", header = TRUE, na.strings = c("NA", "#DIV/0!", ""))
+```
+
+
+### Removing columns that have NA as 95% of the observations for both data set
+```{r remove_na_data, cache=TRUE}
+col_na_filter <- colSums(is.na(data_train))/nrow(data_train) < 0.95
+training_data <- data_train[, col_na_filter == TRUE]
+testing_data <- data_test[, col_na_filter == TRUE]
+```
+
+
+### Checking the two data sets have been successfully filtered
+```{r checking_data, cache=TRUE}
+dim(training_data)
+dim(testing_data)
+```
+
+## Removing the first 7 variables which do not related to the training model.
+```{r tidy_data, cache=TRUE}
+training_data <- training_data[,-c(1:7)]
+testing_data <- testing_data[,-c(1:7)]
+```
+
+### Double check the we dont filtered out classe and problem_id
+```{r double_check, cache=TRUE}
+colnames(training_data)
+colnames(testing_data)
+```
+
+
+# Creating data partition
+```{r data partition, cache=TRUE}
+set.seed(1234)
+inTrain = createDataPartition(y =training_data$classe, p = 3/4, list = FALSE)
+training = training_data[ inTrain,]
+testing = training_data[-inTrain,]
+dim(training)
+dim(testing)
+```
+
+##  Cross validation
+```{r Cross validation, cache=TRUE}
+control <- trainControl(method = "cv", number = 3)
+```
+
+### Predict with decision tree and confusion matrix
+```{r CART model, cache=TRUE, fig.width= 10}
+model_rpart <- train(classe ~ ., data = training, method = "rpart", trControl = control)
+predict_rpart <- predict(model_rpart, testing)
+rpart_cm <- confusionMatrix(predict_rpart, testing$classe)
+```
+```{r Rplot, cache=TRUE, fig.width=10}
+rpart.plot(model_rpart$finalModel)
+```
+
+They showed that this model only has ~50% predication accuracy on the training data, which is not consider as a good model. 
+
+### Random Forest model
+```{r RF_model, cache=TRUE}
+model_rf <- train(classe ~ ., data = training, method = "rf", ntree = 100, trControl = control)
+predict_rf <- predict(model_rf, testing)
+rf_cm <- confusionMatrix(predict_rf, testing$classe)
+```
+
+Plotting RF accuracy
+```{r RF_plot, cache=TRUE, fig.width=10}
+plot(rf_cm$table, main = "Random Forest Prediction Accuracy")
+```
+It shows that the Random Forest Predication model has an accuracy of ~99%, which is a very high 
+
+### Gradient Boosting Model
+```{r GBM, cache=TRUE}
+model_gbm <- train(classe ~ ., data = training, method = "gbm", verbose = FALSE, trControl = control)
+predict_gbm <- predict(model_gbm, testing)
+gbm_cm <- confusionMatrix(predict_gbm, testing$classe)
+```
+
+### Plotting GBM accuracy
+```{r GBM_plot, cache=TRUE, fig.width=10}
+plot(gbm_cm$table, main = "Gradient Boosting Model Accuracy level")
+```
+
+# Model selection
+Comparing the appropriate model which has the highest predication accuracy for the dataset.
+
+```{r compare, cache=TRUE}
+compare <- data.frame(Model = c("Decision Trees (CART)", "Random Forest", "Gradient Boosting"),
+                      Accuracy = rbind(rpart_cm$overall[1], rf_cm$overall[1], 
+                                       gbm_cm$overall[1]))
+
+compare
+``` 
+
+# Conclusion
+
+Random forest model has a higher prediction accuracy (~99%) followed by Gradient Boosting Model (~97%) then Decision Trees model (~50%). As a result, we will use the RF model to predict the test data.
+
+
+# Predicting test-data
+```{r prediction, cache=TRUE}
+pre_rf_test <- predict(model_rf, testing_data)
+pred_result <- data.frame(Problem_id = testing_data$problem_id,
+                          Prediction_outcome = pre_rf_test)
+pred_result
+```
